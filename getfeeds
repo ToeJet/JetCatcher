@@ -9,6 +9,8 @@
 # 2.4  03 Jun 2012   Reworked difference to remove duplicate downloads.
 # 2.5  13 Jun 2012   Updated exclusion filters.   Changed to skip already downloaded.  Only log success.
 # 2.6  20 Jun 2012   Updated exclusion filters.   Generate log of activity
+# 2.7  20 Sep 2012   Updated comparison for feeds.
+
 #
 # By James Toebes
 # http://toebesacademy.com/james
@@ -70,8 +72,6 @@ GetFeed ()
   FEEDNEW=feeds/$FEEDBASE.tmp
   FEEDPREV=feeds/$FEEDBASE
   FEEDDOWN=feeds/$FEEDBASE.dload
-  LISTNEW=feeds/$FEEDBASE.new
-  LISTPREV=feeds/$FEEDBASE.prev
  
   # if current feed exist,  it must be a fail from a previos run. Delete it
   if [ -e $FEEDNEW ]
@@ -105,27 +105,29 @@ GetFeed ()
   then
     if [ -e $FEEDPREV ]
     then
-      # Compare to previous run
-      # find new lines only from diff. = 
-      # Replace ' with " to allow variations
-      # Begin with '> ' 
-      # split to new lines based on "
-      # only parse remaining lines beginning with http://
-      # sort and remove duplicates
+      # Parse File, both new and previous (usually XML)
+      # split to new lines on ' " < > and {space}
+      # remove any line without :// or a 3 to 4 character extension
+      # sort to get unique names
+      #
+      # Compare results from each,
+      # Only look at lines beginning with > (New lines)
+      # change > to new line.
+      # filter out all line not containing :// 
 
-      cat $FEEDNEW  | sed s/\'/\"/g | tr " " "\n" | tr "\"" "\n" | grep ^http:// | sort -u > $LISTNEW
-      cat $FEEDPREV | sed s/\'/\"/g | tr " " "\n" | tr "\"" "\n" | grep ^http:// | sort -u > $LISTPREV
-      for fname in $( diff $LISTPREV $LISTNEW | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep ^http:// )
-      do
+      for fname in $( diff \
+         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr " " "\n" \
+                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
+         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr " " "\n" \
+                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
+         | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep ://)
+      do 
         # get base name - check for file extension.
         FDOWN=${fname##*\/}
         FEXT=${FDOWN##*\.}
         case .$FEXT in
            # known to skip
-          .) ;;
 	  .Atom) ;;
-	  .da) ;;
-	  .di) ;;
 	  .dtd) ;;
 	  .com) ;;
 	  .gif) ;;
@@ -133,6 +135,7 @@ GetFeed ()
 	  .html) ;;
 	  .jpeg) ;;
 	  .jpg) ;;
+	  .php) ;;
 	  .net) ;;
 	  .org) ;;
 	  .php) ;;
@@ -148,19 +151,14 @@ GetFeed ()
 	  .m4a) echo $fname >>$FEEDDOWN ;;
 	  .m4v) echo $fname >>$FEEDDOWN ;;
 	  .swf) echo $fname >>$FEEDDOWN ;;
-          *) #unknown extension.  skip if more than 4 characters
-            if [ $FEXT = ${FEXT:0:4} ]
-            then 
-              echo UNKNOWN EXTENSION -$FEXT-
-            fi
-            ;;
+
+          #unknown extension.
+          *) echo UNKNOWN EXTENSION -$FEXT-;;
         esac
       done
 
       # Done adding.  Remove old copy
       rm $FEEDPREV
-      rm $LISTPREV
-      rm $LISTNEW
     fi
 
     # rename current to previous run
@@ -198,8 +196,8 @@ GetFeed ()
           rm files/$FEEDBASE.$FDOWN > /dev/null 
           echo $fname >>$FEEDDOWN
         else
-          echo $FEEDNAME
-          echo $FEEDNAME $FEEDBASE.$FDOWN $fname > $LOGFILE 
+          # echo $fname
+          echo `date` $FEEDNAME $FEEDBASE.$FDOWN $fname >> $LOGNAME 
         fi
       fi 
     done
