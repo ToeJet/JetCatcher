@@ -3,7 +3,8 @@
 # Ver  Date          Comments
 # 1.0  02 May 2012   Inital write.
 # 2.0  16 May 2012   Complete Rewrite.  Configuration to awkward
-# 2.1  17 May 2012   Revized feed dl to drop new file if no change from previos
+# 2.1  17 May 2012   Revised feed dl to drop new file if no change from previos
+# 2.2  22 May 2012   Revised dl to only get files with extensions.
 #
 # By James Toebes
 # http://toebesacademy.com/james
@@ -59,7 +60,7 @@ GetFeed ()
 {
   #downloads a feed.
   #adds changes to the download queue
-  echo $FEEDNAME
+  # echo $FEEDNAME
 
   # Names for download
   FEEDNEW=feeds/$FEEDBASE.tmp
@@ -105,8 +106,33 @@ GetFeed ()
       # sort and remove duplicates
       for fname in $( diff $FEEDPREV $FEEDNEW | grep '^> ' | grep 'url=\"' | tr "\"" "\n" | grep ^http:// | sort -u )
       do
-	echo QUEUE: $fname
-        echo $fname >>$FEEDDOWN
+        # get base name - check for file extension.
+        FDOWN=${fname##*\/}
+        FEXT=${FDOWN##*\.}
+        case .$FEXT in
+           # known to skip
+          .) ;;
+	  .Atom) ;;
+	  .dtd) ;;
+	  .com) ;;
+	  .gif) ;;
+	  .jpg) ;;
+	  .xml) ;;
+
+           # known to download
+          .ogg) echo $fname >>$FEEDDOWN ;;
+	  .mp3) echo $fname >>$FEEDDOWN ;;
+	  .mp4) echo $fname >>$FEEDDOWN ;;
+	  .m4a) echo $fname >>$FEEDDOWN ;;
+	  .m4v) echo $fname >>$FEEDDOWN ;;
+	  .swf) echo $fname >>$FEEDDOWN ;;
+          *) #unknown extension.  skip if more than 4 characters
+            if [ $FEXT = ${FEXT:0:4} ]
+            then 
+              echo UNKNOWN EXTENSION $FEXT
+            fi
+            ;;
+        esac
       done
 
       # Done adding.  Remove old copy
@@ -132,10 +158,13 @@ GetFeed ()
     # find new
     for fname in `cat $FEEDDOWN.tmp`
     do
-      echo Download: $fname 
-      echo       as: files/$FEEDBASE.${fname##*\/} 
+      FDOWN=${fname##*\/}
+      # it has a file extension, download
+      # echo Download: $fname 
+      # echo       as: files/$FEEDBASE.$FDOWN 
+      echo $FEEDBASE.$FDOWN 
       # remove file and add to retry on any fail
-      wget -q $fname -O files/$FEEDBASE.${fname##*\/}
+      wget -q $fname -O files/$FEEDBASE.$FDOWN
       if [ $? != 0 ]
       then
         rm `basename $fname` 
