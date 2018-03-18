@@ -10,6 +10,7 @@
 # 2.5  13 Jun 2012   Updated exclusion filters.   Changed to skip already downloaded.  Only log success.
 # 2.6  20 Jun 2012   Updated exclusion filters.   Generate log of activity
 # 2.7  20 Sep 2012   Updated comparison for feeds.
+# 2.8  26 Nov 2012   Updated comparison for feeds.  Added additional exclusions
 
 #
 # By James Toebes
@@ -106,7 +107,7 @@ GetFeed ()
     if [ -e $FEEDPREV ]
     then
       # Parse File, both new and previous (usually XML)
-      # split to new lines on ' " < > and {space}
+      # split to new lines on ' " < >, =  and {space}
       # remove any line without :// or a 3 to 4 character extension
       # sort to get unique names
       #
@@ -116,9 +117,9 @@ GetFeed ()
       # filter out all line not containing :// 
 
       for fname in $( diff \
-         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr " " "\n" \
+         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
                          | grep :// | grep '\..\{3,4\}$' | sort -u )\
-         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr " " "\n" \
+         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
                          | grep :// | grep '\..\{3,4\}$' | sort -u )\
          | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep ://)
       do 
@@ -127,7 +128,9 @@ GetFeed ()
         FEXT=${FDOWN##*\.}
         case .$FEXT in
            # known to skip
+	  .) ;;
 	  .Atom) ;;
+	  .aspx) ;;
 	  .dtd) ;;
 	  .com) ;;
 	  .gif) ;;
