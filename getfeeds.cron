@@ -1,0 +1,14 @@
+#!/bin/bash
+# simple bash launcher for cron job
+# Ver  Date          Comments
+# 1.0  26 Sep 2012   Inital write.
+
+# working directory is this folder
+pushd "`dirname "$0"`" >/dev/null
+
+bash ${0%.cron}
+
+popd >/dev/null
+
+exit 0
+
