@@ -1,0 +1,179 @@
+# /bin/bash
+# Simple RSS Downloader
+# Ver  Date          Comments
+# 1.0  02 May 2012   Inital write.
+# 2.0  16 May 2012   Complete Rewrite.  Configuration to awkward
+# 2.1  17 May 2012   Revized feed dl to drop new file if no change from previos
+#
+# By James Toebes
+# http://toebesacademy.com/james
+# James@Toebesacademy.com
+#
+# I wrote this from scratch with no reference.  Wanted a clean implementation.
+# Use as you wish.  I accept no liability for it's use.
+# Please give credit to me if included in another work.
+# if you have questions, suggestions or comments,  just email me.
+# Please email me if you include it in another work.
+#  
+# Parses a file with sames name as script with .feeds extension 
+# downloads each feed.  Compares to previous download (if exist)
+# then searches for links in difference.   Downloads each link.
+#
+# Installation/configuration is simple
+# 1. Put script in folder.
+# 2. create a text file same name as script with .feeds suffix.
+#      1 line per rss feed.  no spaces or comments
+# 3. Run script.
+# two folders will be created in directory of script
+#   feeds - Holds current, previous, and queued feed information
+#   files - Downloaded files.
+#      File names will be based on a cleaned up url. 
+#      downloads from the same feed will have the same prefix.
+# If first run gets you waht you want, put it on cron.
+
+CleanName ()
+{
+   # Cleansup a feedname into a base name for files
+   FEEDBASE=$FEEDNAME
+   FEEDBASE=${FEEDBASE#*\/\/} 			#strip http://, ftp://
+   FEEDBASE=${FEEDBASE//\./_}			#change . to _ for parsing
+   FEEDBASE=${FEEDBASE//-/_}			#change - to _ for parsing
+   FEEDBASE=${FEEDBASE//\//_}			#change / to _ for parsing
+   FEEDBASE=${FEEDBASE//www_/}			#remove www.
+   FEEDBASE=${FEEDBASE//_com_/_}		#remove .com
+   FEEDBASE=${FEEDBASE//_net_/_}		#remove .org
+   FEEDBASE=${FEEDBASE//_org_/_}		#remove .org
+   FEEDBASE=${FEEDBASE//_php/}			#remove .php
+   FEEDBASE=${FEEDBASE//_rss/}			#remove .rss
+   FEEDBASE=${FEEDBASE//_xml/}			#remove .xml
+   FEEDBASE=${FEEDBASE//podcasts/}		#remove podcasts
+   FEEDBASE=${FEEDBASE//podcast/}		#remove podcast
+   FEEDBASE=${FEEDBASE//feeds/}			#remove feeds
+   FEEDBASE=${FEEDBASE//feed/}			#remove feed
+   FEEDBASE=${FEEDBASE//ogg/}			#remove ogg
+   FEEDBASE=${FEEDBASE//_}			#remove _, parsing done
+   # FEEDBASE=$FEEDBASE\_			#add a trailing _
+}
+
+GetFeed ()
+{
+  #downloads a feed.
+  #adds changes to the download queue
+  echo $FEEDNAME
+
+  # Names for download
+  FEEDNEW=feeds/$FEEDBASE.tmp
+  FEEDPREV=feeds/$FEEDBASE
+  FEEDDOWN=feeds/$FEEDBASE.dload
+ 
+  # if current feed exist,  it must be a fail from a previos run. Delete it
+  if [ -e $FEEDNEW ]
+  then
+    rm $FEEDNEW
+  fi
+
+  # download feed. remove if any error
+  wget -q $FEEDNAME -O $FEEDNEW
+  if [ $? != 0 ]
+  then
+      rm $FEEDNEW
+  fi
+
+  # if current feed exist,  it must be a fail from a previos run
+  if [ -e $FEEDNEW ]
+  then
+    # check to see if files the same.  
+    # If it is delete so last dl trigger is filestamp
+    # remove previous feed
+    diff $FEEDNEW $FEEDPREV > /dev/null
+    if [ $? -eq 0 ]
+    then
+      rm $FEEDNEW
+    fi
+  fi
+
+
+  # look for changes - Add to DL Queue
+  if [ -e $FEEDNEW ]
+  then
+    if [ -e $FEEDPREV ]
+    then
+      # Compare to previous run
+      # find new lines only from diff. = Begin with '> '
+      # split to new lines based on "
+      # only parse remaining lines beginning with http://
+      # sort and remove duplicates
+      for fname in $( diff $FEEDPREV $FEEDNEW | grep '^> ' | grep 'url=\"' | tr "\"" "\n" | grep ^http:// | sort -u )
+      do
+	echo QUEUE: $fname
+        echo $fname >>$FEEDDOWN
+      done
+
+      # Done adding.  Remove old copy
+      rm $FEEDPREV
+    fi
+
+    # rename current to previous run
+    mv $FEEDNEW $FEEDPREV
+  fi
+
+  # download files
+  if [ -e $FEEDDOWN ]
+  then
+    # remove previous processing copy
+    if [ -e $FEEDDOWN.tmp ]   
+    then
+      rm $FEEDDOWN.tmp
+    fi
+
+    # move file to processing copy
+    mv $FEEDDOWN $FEEDDOWN.tmp
+
+    # find new
+    for fname in `cat $FEEDDOWN.tmp`
+    do
+      echo Download: $fname 
+      echo       as: files/$FEEDBASE.${fname##*\/} 
+      # remove file and add to retry on any fail
+      wget -q $fname -O files/$FEEDBASE.${fname##*\/}
+      if [ $? != 0 ]
+      then
+        rm `basename $fname` 
+        echo $fname >>$FEEDDOWN
+      fi 
+    done
+
+    # cleanup
+    rm $FEEDDOWN.tmp
+  fi
+}
+
+
+#####
+# Main Routine
+#####
+
+# working directory is this folder
+pushd "`dirname "$0"`" >/dev/null
+
+# Create folder to hold feeds and downloads
+if [ ! -d feeds ]
+then
+  mkdir feeds
+fi
+if [ ! -d files ]
+then
+  mkdir files
+fi
+
+# Process all feeds in list
+for FEEDNAME in `cat "$0.feeds"` 
+do
+  CleanName	#determine FEEDBASE
+  GetFeed 	#Download Feed - Add items to download queue.
+done
+
+popd >/dev/null
+
+exit 0
+
