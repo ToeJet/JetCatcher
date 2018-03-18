@@ -6,6 +6,7 @@
 # 2.1  17 May 2012   Revised feed dl to drop new file if no change from previos
 # 2.2  22 May 2012   Revised dl to only get files with extensions.
 # 2.3  24 May 2012   Allowed ' or " to be used in feed.
+# 2.4  03 Jun 2012   Reworked difference to remove duplicate downloads.
 #
 # By James Toebes
 # http://toebesacademy.com/james
@@ -67,6 +68,8 @@ GetFeed ()
   FEEDNEW=feeds/$FEEDBASE.tmp
   FEEDPREV=feeds/$FEEDBASE
   FEEDDOWN=feeds/$FEEDBASE.dload
+  LISTNEW=feeds/$FEEDBASE.new
+  LISTPREV=feeds/$FEEDBASE.prev
  
   # if current feed exist,  it must be a fail from a previos run. Delete it
   if [ -e $FEEDNEW ]
@@ -107,7 +110,10 @@ GetFeed ()
       # split to new lines based on "
       # only parse remaining lines beginning with http://
       # sort and remove duplicates
-      for fname in $( diff $FEEDPREV $FEEDNEW | sed s/\'/\"/g | grep '^> ' | grep 'url=\"' | tr "\"" "\n" | grep ^http:// | sort -u )
+
+      cat $FEEDNEW  | sed s/\'/\"/g | tr " " "\n" | tr "\"" "\n" | grep ^http:// | sort -u > $LISTNEW
+      cat $FEEDPREV | sed s/\'/\"/g | tr " " "\n" | tr "\"" "\n" | grep ^http:// | sort -u > $LISTPREV
+      for fname in $( diff $LISTPREV $LISTNEW | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep ^http:// )
       do
         # get base name - check for file extension.
         FDOWN=${fname##*\/}
@@ -140,6 +146,8 @@ GetFeed ()
 
       # Done adding.  Remove old copy
       rm $FEEDPREV
+      rm $LISTPREV
+      rm $LISTNEW
     fi
 
     # rename current to previous run
