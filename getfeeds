@@ -8,6 +8,7 @@
 # 2.3  24 May 2012   Allowed ' or " to be used in feed.
 # 2.4  03 Jun 2012   Reworked difference to remove duplicate downloads.
 # 2.5  13 Jun 2012   Updated exclusion filters.   Changed to skip already downloaded.  Only log success.
+# 2.6  20 Jun 2012   Updated exclusion filters.   Generate log of activity
 #
 # By James Toebes
 # http://toebesacademy.com/james
@@ -107,7 +108,7 @@ GetFeed ()
       # Compare to previous run
       # find new lines only from diff. = 
       # Replace ' with " to allow variations
-      # Begin with '> '
+      # Begin with '> ' 
       # split to new lines based on "
       # only parse remaining lines beginning with http://
       # sort and remove duplicates
@@ -138,7 +139,7 @@ GetFeed ()
           .png) ;;
 	  .rss) ;;
 	  .xml) ;;
-          
+          .pdf) ;;
 
            # known to download
           .ogg) echo $fname >>$FEEDDOWN ;;
@@ -183,8 +184,10 @@ GetFeed ()
     do
       FDOWN=${fname##*\/}
       # skip if already downloaded
-      if [ NOT -e $FEEDBASE.$FDOWN ]
-      then 
+      if [ -e files/$FEEDBASE.$FDOWN ]
+      then
+        echo SKIPPING: $FEEDBASE.$FDOWN
+      else
         # it has a file extension, download
         # echo Download: $fname 
         # echo       as: files/$FEEDBASE.$FDOWN 
@@ -192,10 +195,11 @@ GetFeed ()
         wget -q $fname -O files/$FEEDBASE.$FDOWN
         if [ $? != 0 ]
         then
-          rm `basename $fname` 
+          rm files/$FEEDBASE.$FDOWN > /dev/null 
           echo $fname >>$FEEDDOWN
         else
-          echo $FEEDBASE.$FDOWN
+          echo $FEEDNAME
+          echo $FEEDNAME $FEEDBASE.$FDOWN $fname > $LOGFILE 
         fi
       fi 
     done
@@ -222,6 +226,8 @@ if [ ! -d files ]
 then
   mkdir files
 fi
+
+LOGNAME=$0.log
 
 # Process all feeds in list
 for FEEDNAME in `cat "$0.feeds"` 
