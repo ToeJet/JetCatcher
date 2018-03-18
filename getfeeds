@@ -273,6 +273,6 @@ fi
 
 #Process all feeds
 export -f GetFeed
-sed "s/#.*$//g" getfeeds.feeds | xargs -L 1 bash -i -c 'GetFeed $@' _
+sed "s/#.*$//g" getfeeds.feeds | xargs -L 1 bash -c 'GetFeed $@' _
 
 exit 0
