@@ -5,6 +5,7 @@
 # 2.0  16 May 2012   Complete Rewrite.  Configuration to awkward
 # 2.1  17 May 2012   Revised feed dl to drop new file if no change from previos
 # 2.2  22 May 2012   Revised dl to only get files with extensions.
+# 2.3  24 May 2012   Allowed ' or " to be used in feed.
 #
 # By James Toebes
 # http://toebesacademy.com/james
@@ -100,11 +101,13 @@ GetFeed ()
     if [ -e $FEEDPREV ]
     then
       # Compare to previous run
-      # find new lines only from diff. = Begin with '> '
+      # find new lines only from diff. = 
+      # Replace ' with " to allow variations
+      # Begin with '> '
       # split to new lines based on "
       # only parse remaining lines beginning with http://
       # sort and remove duplicates
-      for fname in $( diff $FEEDPREV $FEEDNEW | grep '^> ' | grep 'url=\"' | tr "\"" "\n" | grep ^http:// | sort -u )
+      for fname in $( diff $FEEDPREV $FEEDNEW | sed s/\'/\"/g | grep '^> ' | grep 'url=\"' | tr "\"" "\n" | grep ^http:// | sort -u )
       do
         # get base name - check for file extension.
         FDOWN=${fname##*\/}
