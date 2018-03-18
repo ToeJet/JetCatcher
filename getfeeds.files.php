@@ -20,26 +20,19 @@ for($i=0; $i<$numfiles; $i++)
 ?>
 </select>
 <script>
-function PlayEnded()
-{
-    $fdir = "<?php echo getcwd(); ?>/files/";
-    $fname = document.getElementById("PlayList").value;
-
-    if (document.getElementById("autodelete").checked == true) {
-        unlink($fdir . document.getElementById("PlayList").value);
-    }
-
-    if (document.getElementById("autoadvance").checked == true) {
-        SelectPlayer(1);
-    }
-}
 function SelectPlayer(nav)
 {
+    //$fname =  "<?php echo getcwd(); ?>/files/" . document.getElementById("PlayList").value;
+    $fname =  realpath("files/" + document.getElementById("PlayList").value);
     document.getElementById("curplayer").pause();
     $newid = document.getElementById("PlayList").options.selectedIndex + nav;
     $newvalue = document.getElementById("PlayList").options[$newid].value;
     document.getElementById("PlayList").value = $newvalue;
     ShowPlayer($newvalue);
+    
+//    if (document.getElementById("autodelete").checked == true) {
+//        unlink($fname);
+//    }
 }
 function ConfirmDelete(fname)
 {
@@ -71,10 +64,10 @@ function ShowPlayer(fname)
         $ptype = "audio/mpeg";
         break;
     }
-    document.getElementById("fPlayer").innerHTML = "<" + $pmode + " id=curplayer controls autoplay onended='PlayEnded()' > <source src='files/" + fname + "' type='" + $ptype + "'></" + $pmode + ">"
+    document.getElementById("fPlayer").innerHTML = "<" + $pmode + " id=curplayer controls autoplay onended='SelectPlayer(1)' > <source src='files/" + fname + "' type='" + $ptype + "'></" + $pmode + ">"
 												 + "<br />"
-                                                 + "<button type='button' onclick='SelectPlayer(-1)'>&lt</button>"
-                                                 + "<button type='button' onclick='SelectPlayer(1)'>&gt</button>"
+//                                                 + "<button type='button' onclick='SelectPlayer(-1)'>&lt</button>"
+//                                                 + "<button type='button' onclick='SelectPlayer(1)'>&gt</button>"
                                                  + "<label style='background-color:cyan'><a target='player' href='files/" + fname + "'>" + fname + "</a></label>"
                                                  + "<button type='button' onclick='ConfirmDelete(\"" + fname + "\")'>X</button>" ;
 ;
@@ -87,9 +80,11 @@ function ShowPlayer(fname)
     }
 }
 </script>
+<!--
 <input id='autoplay' type='checkbox'><label for="autoplay">Auto Play</label>
 <input id='autoadvance' type='checkbox'><label for="autoadvance">Auto Advance</label>
-<!-- <input id='autodelete' type='checkbox'><label for="autodelete">Auto Delete</label> -->
+<input id='autodelete' type='checkbox'><label for="autodelete">Auto Delete</label> 
+-->
 <p id="fPlayer"></p><br />
 <p id="cDel"></p></form>
 </body>
