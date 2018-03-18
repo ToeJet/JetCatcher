@@ -19,6 +19,7 @@
 # 3.3  03 Mar 2017   Added pdf to filter list.
 # 3.4  11 Sep 2017   Integrated with NextCloud Instance
 # 3.5  28 Oct 2018   Added filter to substitute &quote; in a feed
+# 3.5  26 Oct 2018   Made Nextcloud Files folder a symlink.
 #
 # By James Toebes
 # http://james.toebesacademy.com
@@ -263,7 +264,7 @@ sed "s/#.*$//g" getfeeds.feeds | xargs -L 1 bash -c 'GetFeed $@' _
 
 #Integrate w/NextCloud
 #Move files into folder and rescan
-mv -f files/* /var/www/nextcloud/data/james/files/Podcasts/
+#mv -f files/* /var/www/nextcloud/data/james/files/Podcasts/
 php /var/www/nextcloud/occ files:scan james --path="james/files/Podcasts"
 
 exit 0
