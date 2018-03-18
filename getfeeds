@@ -1,30 +1,31 @@
 # /bin/bash
 # Simple RSS Downloader
 # Ver  Date          Comments
-# 1.0  02 May 2012   Inital write.
-# 2.0  16 May 2012   Complete Rewrite.  Configuration to awkward
-# 2.1  17 May 2012   Revised feed dl to drop new file if no change from previos
-# 2.2  22 May 2012   Revised dl to only get files with extensions.
+# 1.0  02 May 2012   Initial write.
+# 2.0  16 May 2012   Complete Rewrite.  Configuration too awkward
+# 2.1  17 May 2012   Revised feed download to drop new file if no change from previous
+# 2.2  22 May 2012   Revised download to only get files with extensions.
 # 2.3  24 May 2012   Allowed ' or " to be used in feed.
 # 2.4  03 Jun 2012   Reworked difference to remove duplicate downloads.
-# 2.5  13 Jun 2012   Updated exclusion filters.   Changed to skip already downloaded.  Only log success.
-# 2.6  20 Jun 2012   Updated exclusion filters.   Generate log of activity
+# 2.5  13 Jun 2012   Updated exclusion filters.  Changed to skip already downloaded.  Only log success.
+# 2.6  20 Jun 2012   Updated exclusion filters.  Generate log of activity
 # 2.7  20 Sep 2012   Updated comparison for feeds.
 # 2.8  26 Nov 2012   Updated comparison for feeds.  Added additional exclusions
 # 2.9  18 Apr 2014   Fixed Download file name to exclude {Space} and %
+# 3.0  11 Jul 2014   Added Filters and comments to feed definition.
+#                    Changed feed file read.   General Formatting cleanup
 
 #
 # By James Toebes
-# http://toebesacademy.com/james
+# http://james.toebesacademy.com
 # James@Toebesacademy.com
 #
-# I wrote this from scratch with no reference.  Wanted a clean implementation.
+# Written from scratch with no reference.  Wanted a clean implementation.
 # Use as you wish.  I accept no liability for it's use.
-# Please give credit to me if included in another work.
-# if you have questions, suggestions or comments,  just email me.
-# Please email me if you include it in another work.
+# Please email me before including it in another work, have questions,
+# suggestions or comments.
 #  
-# Parses a file with sames name as script with .feeds extension 
+# Parses a file with same name as script with .feeds extension 
 # downloads each feed.  Compares to previous download (if exist)
 # then searches for links in difference.   Downloads each link.
 #
@@ -38,202 +39,183 @@
 #   files - Downloaded files.
 #      File names will be based on a cleaned up url. 
 #      downloads from the same feed will have the same prefix.
-# If first run gets you waht you want, put it on cron.
+# If first run gets you what you want, put it on cron.
 
 CleanName ()
 {
-   # Cleansup a feedname into a base name for files
-   FEEDBASE=$FEEDNAME
-   FEEDBASE=${FEEDBASE#*\/\/} 			#strip http://, ftp://
-   FEEDBASE=${FEEDBASE//\./_}			#change . to _ for parsing
-   FEEDBASE=${FEEDBASE//-/_}			#change - to _ for parsing
-   FEEDBASE=${FEEDBASE//\//_}			#change / to _ for parsing
-   FEEDBASE=${FEEDBASE//www_/}			#remove www.
-   FEEDBASE=${FEEDBASE//_com_/_}		#remove .com
-   FEEDBASE=${FEEDBASE//_net_/_}		#remove .net
-   FEEDBASE=${FEEDBASE//_org_/_}		#remove .org
-   FEEDBASE=${FEEDBASE//_php/}			#remove .php
-   FEEDBASE=${FEEDBASE//_rss/}			#remove .rss
-   FEEDBASE=${FEEDBASE//_xml/}			#remove .xml
-   FEEDBASE=${FEEDBASE//podcasts/}		#remove podcasts
-   FEEDBASE=${FEEDBASE//podcast/}		#remove podcast
-   FEEDBASE=${FEEDBASE//feeds/}			#remove feeds
-   FEEDBASE=${FEEDBASE//feed/}			#remove feed
-   FEEDBASE=${FEEDBASE//ogg/}			#remove ogg
-   FEEDBASE=${FEEDBASE//_}			#remove _, parsing done
-   # FEEDBASE=$FEEDBASE\_			#add a trailing _
+    #Split arguments to feed and grep filter
+    FEEDNAME=$1
+    FEEDGREP=$2
+
+    # Cleanup a feedname into a base name for files
+    FEEDBASE=${FEEDNAME}
+    FEEDBASE=${FEEDBASE#*\/\/} 		#strip http://, ftp://
+    FEEDBASE=${FEEDBASE//\./_}		#change . to _ for parsing
+    FEEDBASE=${FEEDBASE//-/_}		#change - to _ for parsing
+    FEEDBASE=${FEEDBASE//\//_}		#change / to _ for parsing
+    FEEDBASE=${FEEDBASE//www_/}		#remove www.
+    FEEDBASE=${FEEDBASE//_com_/_}	#remove .com
+    FEEDBASE=${FEEDBASE//_net_/_}	#remove .net
+    FEEDBASE=${FEEDBASE//_org_/_}	#remove .org
+    FEEDBASE=${FEEDBASE//_php/}		#remove .php
+    FEEDBASE=${FEEDBASE//_rss/}		#remove .rss
+    FEEDBASE=${FEEDBASE//_xml/}		#remove .xml
+    FEEDBASE=${FEEDBASE//podcasts/}	#remove podcasts
+    FEEDBASE=${FEEDBASE//podcast/}	#remove podcast
+    FEEDBASE=${FEEDBASE//feeds/}	#remove feeds
+    FEEDBASE=${FEEDBASE//feed/}		#remove feed
+    FEEDBASE=${FEEDBASE//ogg/}		#remove ogg
+    FEEDBASE=${FEEDBASE//_}			#remove _, parsing done
 }
 
 GetFeed ()
 {
-  #downloads a feed.
-  #adds changes to the download queue
-  echo $FEEDNAME
+    #downloads a feed.
+    #adds changes to the download queue
+    echo ${FEEDNAME}
 
-  # Names for download
-  FEEDNEW=feeds/$FEEDBASE.tmp
-  FEEDPREV=feeds/$FEEDBASE
-  FEEDDOWN=feeds/$FEEDBASE.dload
- 
-  # if current feed exist,  it must be a fail from a previos run. Delete it
-  if [ -e $FEEDNEW ]
-  then
-    rm $FEEDNEW
-  fi
+    # Names for download
+    FEEDNEW=feeds/${FEEDBASE}.tmp
+    FEEDPREV=feeds/${FEEDBASE}
+    FEEDDOWN=feeds/${FEEDBASE}.dload
 
-  # download feed. remove if any error
-  wget -q $FEEDNAME -O $FEEDNEW
-  if [ $? != 0 ]
-  then
-      rm $FEEDNEW
-  fi
+    # if current feed exist,  it must be a fail from a previous run. Delete it
+    [ -e ${FEEDNEW} ] && rm ${FEEDNEW}
 
-  # if current feed exist,  it must be a fail from a previos run
-  if [ -e $FEEDNEW ]
-  then
-    # check to see if files the same.  
-    # If it is delete so last dl trigger is filestamp
-    # remove previous feed
-    diff $FEEDNEW $FEEDPREV > /dev/null
-    if [ $? -eq 0 ]
+    # download feed. remove if any error
+    wget -q ${FEEDNAME} -O ${FEEDNEW}
+    if [ $? != 0 ]
     then
-      rm $FEEDNEW
-    fi
-  fi
-
-
-  # look for changes - Add to DL Queue
-  if [ -e $FEEDNEW ]
-  then
-    if [ -e $FEEDPREV ]
-    then
-      # Parse File, both new and previous (usually XML)
-      # split to new lines on ' " < >, =  and {space} " '
-      # remove any line without :// or a 3 to 4 character extension
-      # sort to get unique names
-      #
-      # Compare results from each,
-      # Only look at lines beginning with > (New lines)
-      # change > to new line.
-      # filter out all line not containing :// 
-
-# For Testing
-#FEEDPREV=burnerCrownMML.1
-#FEEDNEW=burnerCrownMML
-
-      diff \
-         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
-                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
-         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
-                         | grep :// | grep '\..\{3,4\}$' | sort -u )
-
-      diff \
-         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
-                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
-         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
-                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
-         | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep :// 
-
-      for fname in $( diff \
-         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
-                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
-         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
-                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
-         | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep ://)
-      do 
-        # get base name - check for file extension.
-        FDOWN=${fname##*\/}
-        FEXT=${FDOWN##*\.}
-        case .$FEXT in
-           # known to skip
-	  .) ;;
-	  .Atom) ;;
-	  .aspx) ;;
-	  .dtd) ;;
-	  .com) ;;
-	  .gif) ;;
-	  .htm) ;;
-	  .html) ;;
-	  .jpeg) ;;
-	  .jpg) ;;
-	  .php) ;;
-	  .net) ;;
-	  .org) ;;
-	  .php) ;;
-          .png) ;;
-	  .rss) ;;
-	  .xml) ;;
-          .pdf) ;;
-          .swf) ;;
-
-           # known to download
-          .ogg) echo $fname >>$FEEDDOWN ;;
-	  .mp3) echo $fname >>$FEEDDOWN ;;
-	  .mp4) echo $fname >>$FEEDDOWN ;;
-	  .m4a) echo $fname >>$FEEDDOWN ;;
-	  .m4v) echo $fname >>$FEEDDOWN ;;
-
-          #unknown extension.
-          *) echo UNKNOWN EXTENSION -$FEXT-;;
-        esac
-      done
-
-      # Done adding.
-      # Remove History copy if it exist
-      # rename previos to history
-      if [ -e $FEEDPREV.1 ] 
-      then
-        rm $FEEDPREV.1
-      fi
-      mv $FEEDPREV $FEEDPREV.1
+        [ -e ${FEEDNEW} ] && rm ${FEEDNEW}
     fi
 
-    # rename current to previous run
-    mv $FEEDNEW $FEEDPREV
-  fi
-
-  # download files
-  if [ -e $FEEDDOWN ]
-  then
-    # remove previous processing copy
-    if [ -e $FEEDDOWN.tmp ]   
+    # if current feed exist,  it must be a fail from a previous run
+    if [ -e ${FEEDNEW} ]
     then
-      rm $FEEDDOWN.tmp
-    fi
-
-    # move file to processing copy
-    mv $FEEDDOWN $FEEDDOWN.tmp
-
-    # find new
-    for fname in `cat $FEEDDOWN.tmp`
-    do
-      FDOWN=${fname##*\/}
-      FDOWN=${FDOWN//%/}
-      FDOWN=${FDOWN// /}
-      # skip if already downloaded
-      if [ -e files/$FEEDBASE.$FDOWN ]
-      then
-        echo SKIPPING: $FEEDBASE.$FDOWN
-      else
-        # it has a file extension, download
-        # echo Download: $fname 
-        # echo       as: files/$FEEDBASE.$FDOWN 
-        # remove file and add to retry on any fail
-        wget -q $fname -O files/$FEEDBASE.$FDOWN
-        if [ $? != 0 ]
+        # check to see if files the same.  
+        # If it is delete so last download trigger is file stamp
+        # remove previous feed
+        diff ${FEEDNEW} ${FEEDPREV} > /dev/null
+        if [ $? -eq 0 ]
         then
-          rm files/$FEEDBASE.$FDOWN > /dev/null 
-          echo $fname >>$FEEDDOWN
-        else
-          # echo $fname
-          echo `date` $FEEDNAME $FEEDBASE.$FDOWN $fname >> $LOGNAME 
+            rm ${FEEDNEW}
         fi
-      fi 
-    done
+    fi
 
-    # cleanup
-    rm $FEEDDOWN.tmp
-  fi
+    # look for changes - Add to DL Queue
+    if [ -e ${FEEDNEW} ]
+    then
+        if [ -e ${FEEDPREV} ]
+        then
+            # Parse File, both new and previous (usually XML)
+            # split to new lines on ' " < >, =  and {space} " '
+            # remove any line without :// or a 3 to 4 character extension
+            # sort to get unique names
+            # apply grep filter as specified
+            #
+            # Compare results from each,
+            # Only look at lines beginning with > (New lines)
+            # change > to new line.
+            # filter out all line not containing :// 
+
+            for fname in $( diff \
+                <(cat ${FEEDPREV} | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
+                <(cat ${FEEDNEW}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
+                | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep :// )
+            do 
+                # get base name - check for file extension.
+                FDOWN=${fname##*\/}
+                FEXT=${FDOWN##*\.}
+                case .${FEXT^^} in
+                    # known to skip
+                    .)     ;;
+                    .ATOM) ;;
+                    .ASPX) ;;
+                    .DTD)  ;;
+                    .COM)  ;;
+                    .CSS)  ;;
+                    .GIF)  ;;
+                    .HTM)  ;;
+                    .HTML) ;;
+                    .JPEG) ;;
+                    .JPG)  ;;
+                    .PHP)  ;;
+                    .NET)  ;;
+                    .ORG)  ;;
+                    .PHP)  ;;
+                    .PNG)  ;;
+                    .RSS)  ;;
+                    .XML)  ;;
+                    .PDF)  ;;
+                    .SWF)  ;;
+
+                    # known to download
+                    .OGG) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .MP3) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .MP4) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .M4A) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .M4V) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+
+                    #unknown extension.
+                    *) echo UNKNOWN EXTENSION -${FEXT}- ${fname};;
+                esac
+            done
+
+            # Done adding.
+            # Remove History copy if it exist
+            # rename previos to history
+            if [ -e ${FEEDPREV}.1 ] 
+            then
+                rm ${FEEDPREV}.1
+            fi
+            mv ${FEEDPREV} ${FEEDPREV}.1
+        fi
+
+        # rename current to previous run
+        mv ${FEEDNEW} ${FEEDPREV}
+    fi
+
+    # download files
+    if [ -e ${FEEDDOWN} ]
+    then
+        # remove previous processing copy
+        if [ -e ${FEEDDOWN}.tmp ]   
+        then
+            rm ${FEEDDOWN}.tmp
+        fi
+       
+        # move file to processing copy
+        mv ${FEEDDOWN} ${FEEDDOWN}.tmp
+       
+        # find new
+        while read fname 
+        do
+            FDOWN=${fname##*\/}
+            FDOWN=${FDOWN//%/}
+            FDOWN=${FDOWN// /}
+            # skip if already downloaded
+            if [ -e files/${FEEDBASE}.$FDOWN ]
+            then
+                echo SKIPPING: ${FEEDBASE}.$FDOWN
+            else
+                # it has a file extension, download
+                # echo Download: ${fname} 
+                # echo       as: files/${FEEDBASE}.$FDOWN 
+                # remove file and add to retry on any fail
+                wget -q ${fname} -O files/${FEEDBASE}.$FDOWN
+                if [ $? != 0 ]
+                then
+                    [ -e files/${FEEDBASE}.$FDOWN ] && rm files/${FEEDBASE}.$FDOWN > /dev/null 
+                    echo ${fname} >>${FEEDDOWN}
+                else
+                    echo $(date) ${FEEDNAME} DOWNLOAD ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME 
+                fi
+            fi 
+        done < ${FEEDDOWN}.tmp
+       
+        # cleanup
+        rm ${FEEDDOWN}.tmp
+    fi
 }
 
 
@@ -242,26 +224,31 @@ GetFeed ()
 #####
 
 # working directory is this folder
-pushd "`dirname "$0"`" >/dev/null
+pushd "$(dirname "$0")" >/dev/null
 
 # Create folder to hold feeds and downloads
 if [ ! -d feeds ]
 then
-  mkdir feeds
+    mkdir feeds
 fi
 if [ ! -d files ]
 then
-  mkdir files
+    mkdir files
 fi
 
+#Determine Log Name
 LOGNAME=$0.log
 
-# Process all feeds in list
-for FEEDNAME in `cat "$0.feeds"` 
+#read all feeds in file.
+while read CURLINE 
 do
-  CleanName	#determine FEEDBASE
-  GetFeed 	#Download Feed - Add items to download queue.
-done
+    #skip blank and comment lines
+    if [ ! -z "${CURLINE}" ] && [ ! "${CURLINE:0:1}" == "#" ]
+    then
+        CleanName	$CURLINE #determine parts
+        GetFeed 	#Download Feed - Add items to download queue.
+    fi
+done < "$0.feeds"
 
 popd >/dev/null
 
