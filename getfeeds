@@ -46,26 +46,36 @@ CleanName ()
     #Split arguments to feed and grep filter
     FEEDNAME=$1
     FEEDGREP=$2
+ 
+    #Cleanup Feedname
+    #FEEDNAME=$(echo "${FEEDNAME}" | sed -e "s/[^a-zA-Z2-9:\/._-=&]//g") #remove non valid characters
+    #FEEDGREP=$(echo "${FEEDGREP}" | sed -e "s/[^a-zA-Z0-9:\/._-=&]//g") #remove non valid characters
+    FEEDNAME=$(echo "${FEEDNAME}" | sed -e "s/[^a-zA-Z0-9:\/._=&\-]//g") #remove non valid characters
+    FEEDGREP=$(echo "${FEEDGREP}" | sed -e "s/[^a-zA-Z0-9:\/._=&\-]//g") #remove non valid characters
 
     # Cleanup a feedname into a base name for files
-    FEEDBASE=${FEEDNAME}
+    FEEDBASE=${FEEDNAME^^}
     FEEDBASE=${FEEDBASE#*\/\/} 		#strip http://, ftp://
+    FEEDBASE=${FEEDBASE//OGG/}		#remove ogg
     FEEDBASE=${FEEDBASE//\./_}		#change . to _ for parsing
     FEEDBASE=${FEEDBASE//-/_}		#change - to _ for parsing
     FEEDBASE=${FEEDBASE//\//_}		#change / to _ for parsing
-    FEEDBASE=${FEEDBASE//www_/}		#remove www.
-    FEEDBASE=${FEEDBASE//_com_/_}	#remove .com
-    FEEDBASE=${FEEDBASE//_net_/_}	#remove .net
-    FEEDBASE=${FEEDBASE//_org_/_}	#remove .org
-    FEEDBASE=${FEEDBASE//_php/}		#remove .php
-    FEEDBASE=${FEEDBASE//_rss/}		#remove .rss
-    FEEDBASE=${FEEDBASE//_xml/}		#remove .xml
-    FEEDBASE=${FEEDBASE//podcasts/}	#remove podcasts
-    FEEDBASE=${FEEDBASE//podcast/}	#remove podcast
-    FEEDBASE=${FEEDBASE//feeds/}	#remove feeds
-    FEEDBASE=${FEEDBASE//feed/}		#remove feed
-    FEEDBASE=${FEEDBASE//ogg/}		#remove ogg
+    FEEDBASE=${FEEDBASE//WWW_/}		#remove www.
+    FEEDBASE=${FEEDBASE//_COM_/_}	#remove .com
+    FEEDBASE=${FEEDBASE//_NET_/_}	#remove .net
+    FEEDBASE=${FEEDBASE//_ORG_/_}	#remove .org
+    FEEDBASE=${FEEDBASE//_PHP/}		#remove .php
+    FEEDBASE=${FEEDBASE//_RSS/}		#remove .rss
+    FEEDBASE=${FEEDBASE//_XML/}		#remove .xml
+    FEEDBASE=${FEEDBASE//PODCASTS/}	#remove podcasts
+    FEEDBASE=${FEEDBASE//PODCAST/}	#remove podcast
+    FEEDBASE=${FEEDBASE//FEEDS/}	#remove feeds
+    FEEDBASE=${FEEDBASE//FEED/}		#remove feed
+    FEEDBASE=${FEEDBASE//OGG/}		#remove ogg
+    FEEDBASE=${FEEDBASE//MP3/}		#remove mp3
+    FEEDBASE=${FEEDBASE//HTML/}		#remove html
     FEEDBASE=${FEEDBASE//_}			#remove _, parsing done
+    FEEDBASE=$(echo "${FEEDBASE}" | sed -e "s/[^a-zA-Z0-9._]//g") #remove non alphanum characters
 }
 
 GetFeed ()
@@ -83,9 +93,10 @@ GetFeed ()
     [ -e ${FEEDNEW} ] && rm ${FEEDNEW}
 
     # download feed. remove if any error
-    wget -q ${FEEDNAME} -O ${FEEDNEW}
+    wget  --quiet --no-check-certificate ${FEEDNAME} -O ${FEEDNEW}
     if [ $? != 0 ]
     then
+	echo "Error getting feed '${FEEDNAME}'"
         [ -e ${FEEDNEW} ] && rm ${FEEDNEW}
     fi
 
@@ -192,7 +203,7 @@ GetFeed ()
         do
             FDOWN=${fname##*\/}
             FDOWN=${FDOWN//%/}
-            FDOWN=${FDOWN// /}
+            FDOWN=$(echo "${FDOWN}" | sed -e "s/[^a-zA-Z0-9._]//g") #remove non alphanum characters
             # skip if already downloaded
             if [ -e files/${FEEDBASE}.$FDOWN ]
             then
@@ -202,7 +213,7 @@ GetFeed ()
                 # echo Download: ${fname} 
                 # echo       as: files/${FEEDBASE}.$FDOWN 
                 # remove file and add to retry on any fail
-                wget -q ${fname} -O files/${FEEDBASE}.$FDOWN
+                wget --quiet --no-check-certificate  ${fname} -O files/${FEEDBASE}.$FDOWN
                 if [ $? != 0 ]
                 then
                     [ -e files/${FEEDBASE}.$FDOWN ] && rm files/${FEEDBASE}.$FDOWN > /dev/null 
