@@ -14,6 +14,7 @@
 # 2.9  18 Apr 2014   Fixed Download file name to exclude {Space} and %
 # 3.0  11 Jul 2014   Added Filters and comments to feed definition.
 #                    Changed feed file read.   General Formatting cleanup
+# 3.1  08 Jun 2015   Fixed issue with empty FEEDGREP
 
 #
 # By James Toebes
@@ -48,10 +49,9 @@ CleanName ()
     FEEDGREP=$2
  
     #Cleanup Feedname
-    #FEEDNAME=$(echo "${FEEDNAME}" | sed -e "s/[^a-zA-Z2-9:\/._-=&]//g") #remove non valid characters
-    #FEEDGREP=$(echo "${FEEDGREP}" | sed -e "s/[^a-zA-Z0-9:\/._-=&]//g") #remove non valid characters
     FEEDNAME=$(echo "${FEEDNAME}" | sed -e "s/[^a-zA-Z0-9:\/._=&\-]//g") #remove non valid characters
     FEEDGREP=$(echo "${FEEDGREP}" | sed -e "s/[^a-zA-Z0-9:\/._=&\-]//g") #remove non valid characters
+    if [ -z "${FEEDGREP}" ] ; then FEEDGREP=. ; fi
 
     # Cleanup a feedname into a base name for files
     FEEDBASE=${FEEDNAME^^}
@@ -130,8 +130,8 @@ GetFeed ()
             # filter out all line not containing :// 
 
             for fname in $( diff \
-                <(cat ${FEEDPREV} | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
-                <(cat ${FEEDNEW}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
+                <(cat ${FEEDPREV} | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
+                <(cat ${FEEDNEW}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
                 | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep :// )
             do 
                 # get base name - check for file extension.
