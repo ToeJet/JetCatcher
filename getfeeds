@@ -11,6 +11,7 @@
 # 2.6  20 Jun 2012   Updated exclusion filters.   Generate log of activity
 # 2.7  20 Sep 2012   Updated comparison for feeds.
 # 2.8  26 Nov 2012   Updated comparison for feeds.  Added additional exclusions
+# 2.9  18 Apr 2014   Fixed Download file name to exclude {Space} and %
 
 #
 # By James Toebes
@@ -67,7 +68,7 @@ GetFeed ()
 {
   #downloads a feed.
   #adds changes to the download queue
-  # echo $FEEDNAME
+  echo $FEEDNAME
 
   # Names for download
   FEEDNEW=feeds/$FEEDBASE.tmp
@@ -107,7 +108,7 @@ GetFeed ()
     if [ -e $FEEDPREV ]
     then
       # Parse File, both new and previous (usually XML)
-      # split to new lines on ' " < >, =  and {space}
+      # split to new lines on ' " < >, =  and {space} " '
       # remove any line without :// or a 3 to 4 character extension
       # sort to get unique names
       #
@@ -115,6 +116,23 @@ GetFeed ()
       # Only look at lines beginning with > (New lines)
       # change > to new line.
       # filter out all line not containing :// 
+
+# For Testing
+#FEEDPREV=burnerCrownMML.1
+#FEEDNEW=burnerCrownMML
+
+      diff \
+         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
+                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
+         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
+                         | grep :// | grep '\..\{3,4\}$' | sort -u )
+
+      diff \
+         <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
+                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
+         <(cat $FEEDNEW  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
+                         | grep :// | grep '\..\{3,4\}$' | sort -u )\
+         | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep :// 
 
       for fname in $( diff \
          <(cat $FEEDPREV | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" \
@@ -146,6 +164,7 @@ GetFeed ()
 	  .rss) ;;
 	  .xml) ;;
           .pdf) ;;
+          .swf) ;;
 
            # known to download
           .ogg) echo $fname >>$FEEDDOWN ;;
@@ -153,15 +172,20 @@ GetFeed ()
 	  .mp4) echo $fname >>$FEEDDOWN ;;
 	  .m4a) echo $fname >>$FEEDDOWN ;;
 	  .m4v) echo $fname >>$FEEDDOWN ;;
-	  .swf) echo $fname >>$FEEDDOWN ;;
 
           #unknown extension.
           *) echo UNKNOWN EXTENSION -$FEXT-;;
         esac
       done
 
-      # Done adding.  Remove old copy
-      rm $FEEDPREV
+      # Done adding.
+      # Remove History copy if it exist
+      # rename previos to history
+      if [ -e $FEEDPREV.1 ] 
+      then
+        rm $FEEDPREV.1
+      fi
+      mv $FEEDPREV $FEEDPREV.1
     fi
 
     # rename current to previous run
@@ -184,6 +208,8 @@ GetFeed ()
     for fname in `cat $FEEDDOWN.tmp`
     do
       FDOWN=${fname##*\/}
+      FDOWN=${FDOWN//%/}
+      FDOWN=${FDOWN// /}
       # skip if already downloaded
       if [ -e files/$FEEDBASE.$FDOWN ]
       then
@@ -240,4 +266,3 @@ done
 popd >/dev/null
 
 exit 0
-
