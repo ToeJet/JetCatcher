@@ -15,6 +15,7 @@
 # 3.0  11 Jul 2014   Added Filters and comments to feed definition.
 #                    Changed feed file read.   General Formatting cleanup
 # 3.1  08 Jun 2015   Fixed issue with empty FEEDGREP
+# 3.2  20 Feb 2017   Fixed issue with repeated download when URL and not filename changes. Changed to monthly log
 
 #
 # By James Toebes
@@ -42,8 +43,15 @@
 #      downloads from the same feed will have the same prefix.
 # If first run gets you what you want, put it on cron.
 
-CleanName ()
+
+GetFeed ()
 {
+	#Exit if nothing to do
+	if [ -z "$1" ]
+	then 
+		return 0
+	fi
+	
     #Split arguments to feed and grep filter
     FEEDNAME=$1
     FEEDGREP=$2
@@ -76,14 +84,11 @@ CleanName ()
     FEEDBASE=${FEEDBASE//HTML/}		#remove html
     FEEDBASE=${FEEDBASE//_}			#remove _, parsing done
     FEEDBASE=$(echo "${FEEDBASE}" | sed -e "s/[^a-zA-Z0-9._]//g") #remove non alphanum characters
-}
 
-GetFeed ()
-{
     #downloads a feed.
     #adds changes to the download queue
-    echo ${FEEDNAME}
-
+    #echo ${FEEDNAME}
+	
     # Names for download
     FEEDNEW=feeds/${FEEDBASE}.tmp
     FEEDPREV=feeds/${FEEDBASE}
@@ -94,9 +99,9 @@ GetFeed ()
 
     # download feed. remove if any error
     wget  --quiet --no-check-certificate ${FEEDNAME} -O ${FEEDNEW}
-    if [ $? != 0 ]
+    if [ $? != 0 ] || [ ! -e ${FEEDNEW} ]
     then
-	echo "Error getting feed '${FEEDNAME}'"
+		echo "Error getting feed '${FEEDNAME}'">> $LOGNAME 
         [ -e ${FEEDNEW} ] && rm ${FEEDNEW}
     fi
 
@@ -128,11 +133,11 @@ GetFeed ()
             # Only look at lines beginning with > (New lines)
             # change > to new line.
             # filter out all line not containing :// 
-
+			
             for fname in $( diff \
-                <(cat ${FEEDPREV} | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
-                <(cat ${FEEDNEW}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${FEEDGREP}" )\
-                | grep '^> ' | tr ">" "\n" | tr " " "\n" | grep :// )
+                <(cat ${FEEDPREV} | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
+                <(cat ${FEEDNEW}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
+                | grep '^> ' | tr ">" "\n" | tr " " "\n" | sort -u | grep -v "^$")
             do 
                 # get base name - check for file extension.
                 FDOWN=${fname##*\/}
@@ -161,14 +166,14 @@ GetFeed ()
                     .SWF)  ;;
 
                     # known to download
-                    .OGG) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
-                    .MP3) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
-                    .MP4) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
-                    .M4A) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
-                    .M4V) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .OGG) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .MP3) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .MP4) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .M4A) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
+                    .M4V) echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME ; echo ${fname} >>${FEEDDOWN} ;;
 
                     #unknown extension.
-                    *) echo UNKNOWN EXTENSION -${FEXT}- ${fname};;
+                    *) echo UNKNOWN EXTENSION -${FEXT}- ${fname} ; echo UNKNOWN EXTENSION -${FEXT}- ${fname} >> $LOGNAME ;;
                 esac
             done
 
@@ -185,7 +190,9 @@ GetFeed ()
         # rename current to previous run
         mv ${FEEDNEW} ${FEEDPREV}
     fi
-
+ 
+ 
+	
     # download files
     if [ -e ${FEEDDOWN} ]
     then
@@ -201,26 +208,32 @@ GetFeed ()
         # find new
         while read fname 
         do
-            FDOWN=${fname##*\/}
-            FDOWN=${FDOWN//%/}
-            FDOWN=$(echo "${FDOWN}" | sed -e "s/[^a-zA-Z0-9._]//g") #remove non alphanum characters
-            # skip if already downloaded
-            if [ -e files/${FEEDBASE}.$FDOWN ]
-            then
-                echo SKIPPING: ${FEEDBASE}.$FDOWN
-            else
-                # it has a file extension, download
-                # echo Download: ${fname} 
-                # echo       as: files/${FEEDBASE}.$FDOWN 
-                # remove file and add to retry on any fail
-                wget --quiet --no-check-certificate  ${fname} -O files/${FEEDBASE}.$FDOWN
-                if [ $? != 0 ]
-                then
-                    [ -e files/${FEEDBASE}.$FDOWN ] && rm files/${FEEDBASE}.$FDOWN > /dev/null 
-                    echo ${fname} >>${FEEDDOWN}
-                else
-                    echo $(date) ${FEEDNAME} DOWNLOAD ${FEEDBASE}.$FDOWN ${fname} >> $LOGNAME 
-                fi
+			FURL=$(cat ${FEEDPREV}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${fname}" | head -1)
+			#Don't download if it cannot be found in current feed.
+			if [ ! -z "${FURL}" ]
+			then 
+				#FDOWN=${FURL##*\/}
+				#FDOWN=${FDOWN//%/}
+				FDOWN=$(echo "${fname}" | sed -e "s/[^a-zA-Z0-9._]//g") #remove non alphanum characters
+				# skip if already downloaded
+				if [ -e files/${FEEDBASE}.${FDOWN} ]
+				then
+					echo $(date) SKIPPING ${FEEDBASE}.${FDOWN} >> $LOGNAME 
+				else
+					# it has a file extension, download
+					# echo Download: ${fname} 
+					# echo       as: files/${FEEDBASE}.${FDOWN} 
+					# remove file and add to retry on any fail
+					wget --quiet --no-check-certificate  ${FURL} -O files/${FEEDBASE}.${FDOWN}
+					if [ $? != 0 ]
+					then
+						[ -e files/${FEEDBASE}.${FDOWN} ] && rm files/${FEEDBASE}.${FDOWN} > /dev/null 
+						#Download failed - Add to retry
+						echo ${fname} >>${FEEDDOWN}
+					else
+						echo $(date) DOWNLOAD ${FEEDBASE}.${FDOWN} ${FURL} >> $LOGNAME 
+					fi
+ 				fi 
             fi 
         done < ${FEEDDOWN}.tmp
        
@@ -234,8 +247,8 @@ GetFeed ()
 # Main Routine
 #####
 
-# working directory is this folder
-pushd "$(dirname "$0")" >/dev/null
+# working directory is folder of this script
+cd "$(dirname "$(readlink -f "$0")")"
 
 # Create folder to hold feeds and downloads
 if [ ! -d feeds ]
@@ -248,19 +261,18 @@ then
 fi
 
 #Determine Log Name
-LOGNAME=$0.log
+#LOGNAME=$0.log
+#Monthly Log Name
+LOGNAME=$(basename $0).$(date +'%Y%m').log
+if [ ! -f "${LOGNAME}" ]
+then
+	[ -e $(basename $0).log ] && rm $(basename $0).log
+	touch ${LOGNAME}
+	ln -s ${LOGNAME} $(basename $0).log
+fi
 
-#read all feeds in file.
-while read CURLINE 
-do
-    #skip blank and comment lines
-    if [ ! -z "${CURLINE}" ] && [ ! "${CURLINE:0:1}" == "#" ]
-    then
-        CleanName	$CURLINE #determine parts
-        GetFeed 	#Download Feed - Add items to download queue.
-    fi
-done < "$0.feeds"
-
-popd >/dev/null
+#Process all feeds
+export -f GetFeed
+sed "s/#.*$//g" getfeeds.feeds | xargs -L 1 bash -i -c 'GetFeed $@' _
 
 exit 0
