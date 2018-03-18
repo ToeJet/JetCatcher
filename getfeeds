@@ -18,6 +18,7 @@
 # 3.2  20 Feb 2017   Fixed issue with repeated download when URL and not filename changes. Changed to monthly log
 # 3.3  03 Mar 2017   Added pdf to filter list.
 # 3.4  11 Sep 2017   Integrated with NextCloud Instance
+# 3.5  28 Oct 2018   Added filter to substitute &quote; in a feed
 #
 # By James Toebes
 # http://james.toebesacademy.com
@@ -136,8 +137,8 @@ GetFeed ()
             # filter out all line not containing :// 
 			
             for fname in $( diff \
-                <(cat ${FEEDPREV} | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
-                <(cat ${FEEDNEW}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
+                <(cat ${FEEDPREV} | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
+                <(cat ${FEEDNEW}  | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
                 | grep '^> ' | tr ">" "\n" | tr " " "\n" | sort -u | grep -v "^$")
             do 
                 # get base name - check for file extension.
@@ -193,7 +194,7 @@ GetFeed ()
         # find new
         while read fname 
         do
-			FURL=$(cat ${FEEDPREV}  | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${fname}" | head -1)
+			FURL=$(cat ${FEEDPREV} | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sort -u | grep -i "${fname}" | head -1)
 			#Don't download if it cannot be found in current feed.
 			if [ ! -z "${FURL}" ]
 			then 
