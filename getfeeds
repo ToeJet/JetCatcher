@@ -7,6 +7,7 @@
 # 2.2  22 May 2012   Revised dl to only get files with extensions.
 # 2.3  24 May 2012   Allowed ' or " to be used in feed.
 # 2.4  03 Jun 2012   Reworked difference to remove duplicate downloads.
+# 2.5  13 Jun 2012   Updated exclusion filters.   Changed to skip already downloaded.  Only log success.
 #
 # By James Toebes
 # http://toebesacademy.com/james
@@ -44,7 +45,7 @@ CleanName ()
    FEEDBASE=${FEEDBASE//\//_}			#change / to _ for parsing
    FEEDBASE=${FEEDBASE//www_/}			#remove www.
    FEEDBASE=${FEEDBASE//_com_/_}		#remove .com
-   FEEDBASE=${FEEDBASE//_net_/_}		#remove .org
+   FEEDBASE=${FEEDBASE//_net_/_}		#remove .net
    FEEDBASE=${FEEDBASE//_org_/_}		#remove .org
    FEEDBASE=${FEEDBASE//_php/}			#remove .php
    FEEDBASE=${FEEDBASE//_rss/}			#remove .rss
@@ -122,11 +123,22 @@ GetFeed ()
            # known to skip
           .) ;;
 	  .Atom) ;;
+	  .da) ;;
+	  .di) ;;
 	  .dtd) ;;
 	  .com) ;;
 	  .gif) ;;
+	  .htm) ;;
+	  .html) ;;
+	  .jpeg) ;;
 	  .jpg) ;;
+	  .net) ;;
+	  .org) ;;
+	  .php) ;;
+          .png) ;;
+	  .rss) ;;
 	  .xml) ;;
+          
 
            # known to download
           .ogg) echo $fname >>$FEEDDOWN ;;
@@ -138,7 +150,7 @@ GetFeed ()
           *) #unknown extension.  skip if more than 4 characters
             if [ $FEXT = ${FEXT:0:4} ]
             then 
-              echo UNKNOWN EXTENSION $FEXT
+              echo UNKNOWN EXTENSION -$FEXT-
             fi
             ;;
         esac
@@ -170,16 +182,21 @@ GetFeed ()
     for fname in `cat $FEEDDOWN.tmp`
     do
       FDOWN=${fname##*\/}
-      # it has a file extension, download
-      # echo Download: $fname 
-      # echo       as: files/$FEEDBASE.$FDOWN 
-      echo $FEEDBASE.$FDOWN 
-      # remove file and add to retry on any fail
-      wget -q $fname -O files/$FEEDBASE.$FDOWN
-      if [ $? != 0 ]
-      then
-        rm `basename $fname` 
-        echo $fname >>$FEEDDOWN
+      # skip if already downloaded
+      if [ NOT -e $FEEDBASE.$FDOWN ]
+      then 
+        # it has a file extension, download
+        # echo Download: $fname 
+        # echo       as: files/$FEEDBASE.$FDOWN 
+        # remove file and add to retry on any fail
+        wget -q $fname -O files/$FEEDBASE.$FDOWN
+        if [ $? != 0 ]
+        then
+          rm `basename $fname` 
+          echo $fname >>$FEEDDOWN
+        else
+          echo $FEEDBASE.$FDOWN
+        fi
       fi 
     done
 
