@@ -18,8 +18,9 @@
 # 3.2  20 Feb 2017   Fixed issue with repeated download when URL and not filename changes. Changed to monthly log
 # 3.3  03 Mar 2017   Added pdf to filter list.
 # 3.4  11 Sep 2017   Integrated with NextCloud Instance
-# 3.5  28 Oct 2018   Added filter to substitute &quote; in a feed
-# 3.5  26 Oct 2018   Made Nextcloud Files folder a symlink.
+# 3.5  28 Oct 2017   Added filter to substitute &quote; in a feed
+# 3.6  26 Oct 2017   Made Nextcloud Files folder a symlink.
+# 3.7  09 May 2018   Added excessive download protection,
 #
 # By James Toebes
 # http://james.toebesacademy.com
@@ -104,7 +105,7 @@ GetFeed ()
     wget  --quiet --no-check-certificate ${FEEDNAME} -O ${FEEDNEW}
     if [ $? != 0 ] || [ ! -e ${FEEDNEW} ]
     then
-		echo "Error getting feed '${FEEDNAME}'">> $LOGNAME 
+        echo "Error getting feed '${FEEDNAME}'">> $LOGNAME 
         [ -e ${FEEDNEW} ] && rm ${FEEDNEW}
     fi
 
@@ -136,33 +137,43 @@ GetFeed ()
             # Only look at lines beginning with > (New lines)
             # change > to new line.
             # filter out all line not containing :// 
-			
-            for fname in $( diff \
+
+            #Bail out if a large number of files
+            if [ 10 -lt $( diff \
                 <(cat ${FEEDPREV} | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
                 <(cat ${FEEDNEW}  | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
-                | grep '^> ' | tr ">" "\n" | tr " " "\n" | sort -u | grep -v "^$")
-            do 
-                # get base name - check for file extension.
-                FDOWN=${fname##*\/}
-                FEXT=${FDOWN##*\.}
-                case .${FEXT^^} in
-                    # known to skip
-                    . | .ATOM | .ASPX | .DTD | .COM | .CSS | .GIF | .HTM | .HTML | .JPEG | .JPG | .PHP | .NET | .ORG | .PDF | .PHP | .PNG | .RSS | .XML | .PDF | .SWF )
-                        ;;
+                | grep '^> ' | tr ">" "\n" | tr " " "\n" | sort -u | grep -v "^$" | wc -l ) ]
+            then
+                echo EXCESSIVE DOWNLOADS DETECTED - SKIPPING DOWNLOADS: ${FEEDNAME}
+                echo EXCESSIVE DOWNLOADS DETECTED - SKIPPING DOWNLOADS: ${FEEDNAME}} >> $LOGNAME
+			else            
+		        for fname in $( diff \
+		            <(cat ${FEEDPREV} | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
+		            <(cat ${FEEDNEW}  | sed 's/\&quot;/"/g' | tr "'" "\n" | tr "\"" "\n" | tr "\<" "\n" | tr "\>" "\n" | tr "=" "\n" | tr " " "\n" | tr " " "\n" | grep :// | grep '\..\{3,4\}$' | sed "s/^.*\///g" | sort -u | grep -i "${FEEDGREP}" )\
+		            | grep '^> ' | tr ">" "\n" | tr " " "\n" | sort -u | grep -v "^$")
+		        do 
+		            # get base name - check for file extension.
+		            FDOWN=${fname##*\/}
+		            FEXT=${FDOWN##*\.}
+		            case .${FEXT^^} in
+		                # known to skip
+		                . | .ATOM | .ASPX | .DTD | .COM | .CSS | .GIF | .HTM | .HTML | .JPEG | .JPG | .PHP | .NET | .ORG | .PDF | .PHP | .PNG | .RSS | .XML | .PDF | .SWF )
+		                    ;;
 
-                    # known to download
-                    .OGG | .MP3 | .MP4 | .M4A | .M4V )
-                        echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME
-                        echo ${fname} >>${FEEDDOWN}
-                        ;;
+		                # known to download
+		                .OGG | .MP3 | .MP4 | .M4A | .M4V )
+		                    echo $(date) ${FEEDNAME} NEW ${FEEDBASE}.${FDOWN} ${fname} >> $LOGNAME
+		                    echo ${fname} >>${FEEDDOWN}
+		                    ;;
 
-                    #unknown extension.
-                    *)
-                        echo UNKNOWN EXTENSION -${FEXT}- ${fname}
-                        echo UNKNOWN EXTENSION -${FEXT}- ${fname} >> $LOGNAME
-                        ;;
-                esac
-            done
+		                #unknown extension.
+		                *)
+		                    echo UNKNOWN EXTENSION -${FEXT}- ${fname}
+		                    echo UNKNOWN EXTENSION -${FEXT}- ${fname} >> $LOGNAME
+		                    ;;
+		            esac
+		        done
+            fi
 
             # Done adding.
             # Remove History copy if it exist
